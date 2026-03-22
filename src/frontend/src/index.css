@@ -1,0 +1,66 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    /* Dark fintech — deep navy bg, emerald accent for gains, rose for loss */
+    --background: 0.12 0.02 255;
+    --foreground: 0.95 0.01 248;
+    --card: 0.16 0.03 256;
+    --card-foreground: 0.95 0.01 248;
+    --popover: 0.19 0.035 255;
+    --popover-foreground: 0.95 0.01 248;
+    --primary: 0.72 0.19 160;
+    --primary-foreground: 0.1 0.02 160;
+    --secondary: 0.21 0.04 254;
+    --secondary-foreground: 0.95 0.01 248;
+    --muted: 0.19 0.03 254;
+    --muted-foreground: 0.65 0.02 248;
+    --accent: 0.72 0.19 160;
+    --accent-foreground: 0.1 0.02 160;
+    --destructive: 0.58 0.22 25;
+    --destructive-foreground: 0.98 0 0;
+    --border: 0.26 0.035 255;
+    --input: 0.21 0.04 255;
+    --ring: 0.72 0.19 160;
+    --success: 0.72 0.19 160;
+    --warning: 0.78 0.18 75;
+    --chart-1: 0.72 0.19 160;
+    --chart-2: 0.78 0.18 75;
+    --chart-3: 0.58 0.22 25;
+    --chart-4: 0.55 0.18 254;
+    --chart-5: 0.67 0.16 251;
+    --sidebar: 0.11 0.025 256;
+    --sidebar-foreground: 0.95 0.01 248;
+    --sidebar-primary: 0.72 0.19 160;
+    --sidebar-primary-foreground: 0.1 0.02 160;
+    --sidebar-accent: 0.18 0.04 255;
+    --sidebar-accent-foreground: 0.95 0.01 248;
+    --sidebar-border: 0.22 0.035 255;
+    --sidebar-ring: 0.72 0.19 160;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  }
+
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.3 0.04 255);
+    border-radius: 99px;
+  }
+}
