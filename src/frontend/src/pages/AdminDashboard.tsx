@@ -28,7 +28,9 @@ import {
   Server,
   ShieldCheck,
   Ticket,
+  Trash2,
   TrendingUp,
+  UserPlus,
   Users,
   Wallet,
 } from "lucide-react";
@@ -49,6 +51,36 @@ import {
   useTotalUserCount,
   useWithdrawAdminWallet,
 } from "../hooks/useQueries";
+
+const CUSTOM_CODES_KEY = "tradex_custom_invite_codes";
+
+export interface CustomInviteCode {
+  code: string;
+  userName: string;
+  note: string;
+  created: string;
+  used: boolean;
+}
+
+export function getCustomInviteCodes(): CustomInviteCode[] {
+  try {
+    return JSON.parse(localStorage.getItem(CUSTOM_CODES_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomInviteCodes(codes: CustomInviteCode[]) {
+  localStorage.setItem(CUSTOM_CODES_KEY, JSON.stringify(codes));
+}
+
+export function markCustomCodeUsed(code: string) {
+  const codes = getCustomInviteCodes();
+  const updated = codes.map((c) =>
+    c.code === code ? { ...c, used: true } : c,
+  );
+  saveCustomInviteCodes(updated);
+}
 
 interface AdminDashboardProps {
   currentSection: AdminSection;
@@ -144,6 +176,54 @@ function InviteCodesSection() {
   const generate = useGenerateInviteCode();
   const [copied, setCopied] = useState<string | null>(null);
 
+  // Custom code state
+  const [customCode, setCustomCode] = useState("");
+  const [customUserName, setCustomUserName] = useState("");
+  const [customNote, setCustomNote] = useState("");
+  const [customCodes, setCustomCodes] =
+    useState<CustomInviteCode[]>(getCustomInviteCodes);
+
+  const refreshCustomCodes = () => setCustomCodes(getCustomInviteCodes());
+
+  const handleCreateCustomCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = customCode.trim();
+    const userName = customUserName.trim();
+    if (!code) {
+      toast.error("Code value टाका");
+      return;
+    }
+    if (!userName) {
+      toast.error("User चे नाव टाका");
+      return;
+    }
+    const existing = getCustomInviteCodes();
+    if (existing.some((c) => c.code === code)) {
+      toast.error("हा code आधीच exist करतो");
+      return;
+    }
+    const newCode: CustomInviteCode = {
+      code,
+      userName,
+      note: customNote.trim(),
+      created: new Date().toLocaleDateString("en-IN"),
+      used: false,
+    };
+    saveCustomInviteCodes([...existing, newCode]);
+    refreshCustomCodes();
+    setCustomCode("");
+    setCustomUserName("");
+    setCustomNote("");
+    toast.success(`✅ Invite code "${code}" created for ${userName}!`);
+  };
+
+  const deleteCustomCode = (code: string) => {
+    const updated = getCustomInviteCodes().filter((c) => c.code !== code);
+    saveCustomInviteCodes(updated);
+    refreshCustomCodes();
+    toast.success("Code deleted");
+  };
+
   const copyLink = (code: string) => {
     const url = `${window.location.origin}?code=${code}`;
     navigator.clipboard.writeText(url);
@@ -157,12 +237,16 @@ function InviteCodesSection() {
     toast.success("Code copied!");
   };
 
+  const totalCustom = customCodes.length;
+  const usedCustom = customCodes.filter((c) => c.used).length;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
+      className="space-y-8"
     >
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Invite Codes</h2>
@@ -181,78 +265,103 @@ function InviteCodesSection() {
           ) : (
             <PlusCircle className="w-4 h-4" />
           )}
-          Generate Code
+          Auto Generate
         </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Total Codes</p>
-            <p className="text-2xl font-bold">{codes?.length ?? 0}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Used</p>
-            <p className="text-2xl font-bold text-destructive">
-              {codes?.filter((c) => c.used).length ?? 0}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Available</p>
-            <p className="text-2xl font-bold text-primary">
-              {codes?.filter((c) => !c.used).length ?? 0}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">All Invite Codes</CardTitle>
+      {/* --- CUSTOM INVITE CODE CREATOR --- */}
+      <Card className="bg-card border-primary/30 border">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2 text-primary">
+            <UserPlus className="w-4 h-4" />
+            नवीन User साठी Custom Invite Code बनवा
+          </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div
-              className="p-4 space-y-2"
-              data-ocid="admin.invites.loading_state"
-            >
-              {[1, 2, 3].map((k) => (
-                <Skeleton key={k} className="h-12 w-full" />
-              ))}
+        <CardContent>
+          <form onSubmit={handleCreateCustomCode} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">User चे नाव *</Label>
+                <Input
+                  data-ocid="admin.invites.custom_username"
+                  className="bg-input border-border"
+                  placeholder="e.g. Rahul Sharma"
+                  value={customUserName}
+                  onChange={(e) => setCustomUserName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Invite Code Value *</Label>
+                <Input
+                  data-ocid="admin.invites.custom_code"
+                  className="bg-input border-border font-mono tracking-widest"
+                  placeholder="e.g. RAHUL2024"
+                  value={customCode}
+                  onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
+                  required
+                />
+              </div>
             </div>
-          ) : !codes?.length ? (
-            <div
-              className="p-8 text-center text-muted-foreground"
-              data-ocid="admin.invites.empty_state"
-            >
-              <Ticket className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              No codes yet. Generate your first invite code.
+            <div className="space-y-1.5">
+              <Label className="text-xs">Note (optional)</Label>
+              <Input
+                data-ocid="admin.invites.custom_note"
+                className="bg-input border-border"
+                placeholder="e.g. Referred by Tushar"
+                value={customNote}
+                onChange={(e) => setCustomNote(e.target.value)}
+              />
             </div>
-          ) : (
-            <Table data-ocid="admin.invites.table">
+            <Button
+              data-ocid="admin.invites.create_custom_button"
+              type="submit"
+              className="w-full bg-primary text-primary-foreground"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Create Custom Invite Code
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Custom Codes Table */}
+      {customCodes.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserPlus className="w-4 h-4 text-primary" />
+              Custom Invite Codes ({totalCustom} total · {usedCustom} used ·{" "}
+              {totalCustom - usedCustom} available)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
               <TableHeader>
                 <TableRow className="border-border">
+                  <TableHead>User</TableHead>
                   <TableHead>Code</TableHead>
+                  <TableHead>Note</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {codes.map((c, i) => (
+                {customCodes.map((c, i) => (
                   <TableRow
                     key={c.code}
-                    data-ocid={`admin.invites.item.${i + 1}`}
+                    data-ocid={`admin.invites.custom.${i + 1}`}
                     className="border-border"
                   >
+                    <TableCell className="font-medium">{c.userName}</TableCell>
                     <TableCell>
                       <code className="font-mono text-sm bg-muted/40 px-2 py-0.5 rounded text-primary">
                         {c.code}
                       </code>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {c.note || "—"}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -263,18 +372,15 @@ function InviteCodesSection() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
-                      {new Date(
-                        Number(c.created / BigInt(1_000_000)),
-                      ).toLocaleDateString("en-IN")}
+                      {c.created}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1">
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-7 px-2 gap-1 text-xs"
                           onClick={() => copyCode(c.code)}
-                          data-ocid="admin.invites.secondary_button"
                         >
                           <Copy className="w-3 h-3" /> Code
                         </Button>
@@ -283,7 +389,6 @@ function InviteCodesSection() {
                           variant="ghost"
                           className="h-7 px-2 gap-1 text-xs text-primary"
                           onClick={() => copyLink(c.code)}
-                          data-ocid="admin.invites.secondary_button"
                         >
                           {copied === c.code ? (
                             <Check className="w-3 h-3" />
@@ -292,15 +397,150 @@ function InviteCodesSection() {
                           )}{" "}
                           Link
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-destructive hover:text-destructive"
+                          onClick={() => deleteCustomCode(c.code)}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Auto-generated codes */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
+          Auto-Generated Codes
+        </h3>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground mb-1">Total Codes</p>
+              <p className="text-2xl font-bold">{codes?.length ?? 0}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground mb-1">Used</p>
+              <p className="text-2xl font-bold text-destructive">
+                {codes?.filter((c) => c.used).length ?? 0}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground mb-1">Available</p>
+              <p className="text-2xl font-bold text-primary">
+                {codes?.filter((c) => !c.used).length ?? 0}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              All Auto-Generated Codes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div
+                className="p-4 space-y-2"
+                data-ocid="admin.invites.loading_state"
+              >
+                {[1, 2, 3].map((k) => (
+                  <Skeleton key={k} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : !codes?.length ? (
+              <div
+                className="p-8 text-center text-muted-foreground"
+                data-ocid="admin.invites.empty_state"
+              >
+                <Ticket className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                No codes yet. Click "Auto Generate" to create one.
+              </div>
+            ) : (
+              <Table data-ocid="admin.invites.table">
+                <TableHeader>
+                  <TableRow className="border-border">
+                    <TableHead>Code</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {codes.map((c, i) => (
+                    <TableRow
+                      key={c.code}
+                      data-ocid={`admin.invites.item.${i + 1}`}
+                      className="border-border"
+                    >
+                      <TableCell>
+                        <code className="font-mono text-sm bg-muted/40 px-2 py-0.5 rounded text-primary">
+                          {c.code}
+                        </code>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={c.used ? "destructive" : "outline"}
+                          className={
+                            c.used ? "" : "border-primary text-primary"
+                          }
+                        >
+                          {c.used ? "Used" : "Available"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {new Date(
+                          Number(c.created / BigInt(1_000_000)),
+                        ).toLocaleDateString("en-IN")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 gap-1 text-xs"
+                            onClick={() => copyCode(c.code)}
+                            data-ocid="admin.invites.secondary_button"
+                          >
+                            <Copy className="w-3 h-3" /> Code
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 gap-1 text-xs text-primary"
+                            onClick={() => copyLink(c.code)}
+                            data-ocid="admin.invites.secondary_button"
+                          >
+                            {copied === c.code ? (
+                              <Check className="w-3 h-3" />
+                            ) : (
+                              <Link2 className="w-3 h-3" />
+                            )}{" "}
+                            Link
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </motion.div>
   );
 }
